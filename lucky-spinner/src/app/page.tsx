@@ -133,7 +133,7 @@ export default function Home() {
         </div>
 
         <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="flex justify-center">
+          <div className="flex flex-col items-center gap-4">
             <div className="relative aspect-square w-full max-w-[420px]">
               <div
                 role="button"
@@ -193,6 +193,13 @@ export default function Home() {
               </div>
 
             </div>
+            <p aria-live="polite" className="text-center text-sm font-semibold text-cyan-200">
+              {isSpinning
+                ? "The wheel is spinning..."
+                : entries.length < 2
+                  ? "Add at least two names, then tap the wheel to spin"
+                  : "Tap the wheel to spin"}
+            </p>
           </div>
 
           <div className="space-y-5">
@@ -265,19 +272,6 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
-              <p className="mb-2 text-sm font-medium text-slate-200">Winner</p>
-
-              <div className="min-h-[52px] rounded-xl bg-slate-900 p-3 text-lg font-bold text-white">
-                {winner
-                  ? winner
-                  : isSpinning
-                    ? "Spinning..."
-                    : entries.length < 2
-                      ? "Add at least two names to spin"
-                      : "Click or tap the wheel to spin"}
-              </div>
-            </div>
           </div>
         </div>
       </div>
