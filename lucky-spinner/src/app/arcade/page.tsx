@@ -6,19 +6,26 @@ import { ArrowLeft, Coins, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const prizes = [
-  { label: "NO PRIZE", multiplier: 0, angle: 40, color: "#ed5b53" },
-  { label: "0.5x", multiplier: 0.5, angle: 55, color: "#e8a534" },
-  { label: "1x", multiplier: 1, angle: 55, color: "#20a88b" },
-  { label: "2x", multiplier: 2, angle: 55, color: "#268ec2" },
-  { label: "3x", multiplier: 3, angle: 50, color: "#df5484" },
-  { label: "5x", multiplier: 5, angle: 40, color: "#dd7137" },
-  { label: "10x", multiplier: 10, angle: 30, color: "#68833b" },
-  { label: "25x", multiplier: 25, angle: 20, color: "#52a5c5" },
-  { label: "50x", multiplier: 50, angle: 15, color: "#d0ad43" },
+  { label: "NO PRIZE", multiplier: 0, angle: 136.5, color: "#ed5b53" },
+  { label: "0.5x", multiplier: 0.5, angle: 100, color: "#e8a534" },
+  { label: "1x", multiplier: 1, angle: 76, color: "#20a88b" },
+  { label: "2x", multiplier: 2, angle: 30, color: "#268ec2" },
+  { label: "3x", multiplier: 3, angle: 10, color: "#df5484" },
+  { label: "5x", multiplier: 5, angle: 4, color: "#dd7137" },
+  { label: "10x", multiplier: 10, angle: 2, color: "#68833b" },
+  { label: "25x", multiplier: 25, angle: 1, color: "#52a5c5" },
+  { label: "50x", multiplier: 50, angle: 0.5, color: "#d0ad43" },
 ] as const;
 
 const wagers = [5, 10, 25, 50];
 const wheelRadius = 128;
+const totalWheelAngle = prizes.reduce((total, prize) => total + prize.angle, 0);
+const payoutWeightedAngle = prizes.reduce(
+  (total, prize) => total + prize.angle * prize.multiplier,
+  0
+);
+const theoreticalRtp = payoutWeightedAngle / totalWheelAngle;
+const houseEdge = 1 - theoreticalRtp;
 const prizeCenters = prizes.map((prize, index) =>
   prizes.slice(0, index).reduce((angle, previousPrize) => angle + previousPrize.angle, 0) + prize.angle / 2
 );
@@ -84,7 +91,7 @@ export default function ArcadePage() {
     setRotation(targetRotation);
 
     window.setTimeout(() => {
-      const prizeReturn = Math.round(wager * selection.prize.multiplier);
+      const prizeReturn = wager * selection.prize.multiplier;
       setResult(selection.prize);
       setReturned(prizeReturn);
       setBalance((currentBalance) => currentBalance + prizeReturn);
@@ -158,6 +165,7 @@ export default function ArcadePage() {
                 style={{ background: wheelGradient, transform: `rotate(${rotation}deg)` }}
               >
                 {prizes.map((prize, index) => {
+                  if (prize.angle < 10) return null;
                     const center = prizeCenters[index];
                     return (
                       <span
@@ -231,7 +239,7 @@ export default function ArcadePage() {
               </div>
               <div className="space-y-2">
                 {prizes.map((prize) => {
-                  const chance = `${(prize.angle / 360 * 100).toFixed(prize.angle < 36 ? 1 : 0)}%`;
+                  const chance = `${(prize.angle / totalWheelAngle * 100).toFixed(prize.angle < 10 ? 2 : prize.angle < 36 ? 1 : 0)}%`;
                   return (
                     <div key={prize.label} className="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-black/15 px-3 py-2.5">
                       <span className="h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: prize.color, boxShadow: `0 0 10px ${prize.color}66` }} />
@@ -241,9 +249,23 @@ export default function ArcadePage() {
                   );
                 })}
               </div>
-              <p className="mt-4 border-t border-white/10 pt-4 text-xs leading-relaxed text-white/45">
-                A slice’s size shows its chance. The multiplier is applied to your wager when you land on it.
-              </p>
+              <div className="mt-4 grid grid-cols-2 gap-2 border-t border-white/10 pt-4">
+                <div className="rounded-lg bg-black/15 p-3">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/45">Theoretical RTP</p>
+                  <p className="mt-1 font-mono text-lg font-bold tabular-nums text-[#61d4bf]">{(theoreticalRtp * 100).toFixed(2)}%</p>
+                </div>
+                <div className="rounded-lg bg-black/15 p-3">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/45">House edge</p>
+                  <p className="mt-1 font-mono text-lg font-bold tabular-nums text-[#f5d66e]">{(houseEdge * 100).toFixed(2)}%</p>
+                </div>
+                <div className="col-span-2 rounded-lg bg-black/15 p-3">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/45">Expected net per spin</p>
+                    <p className="font-mono text-sm font-bold tabular-nums text-[#f2a39b]">Player -{formatCredits(wager * houseEdge)} · House +{formatCredits(wager * houseEdge)}</p>
+                  </div>
+                  <p className="mt-1 text-[10px] text-white/35">{payoutWeightedAngle}° weighted return ÷ {totalWheelAngle}° total = {(theoreticalRtp * 100).toFixed(2)}% RTP</p>
+                </div>
+              </div>
             </section>
 
             <section className="rounded-2xl border border-white/10 bg-[#121927]/85 p-5 sm:p-6">
