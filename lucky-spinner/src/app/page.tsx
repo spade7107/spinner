@@ -108,6 +108,7 @@ export default function Home() {
                   background: entries.length
                     ? wheelGradient
                     : "radial-gradient(circle, rgba(15, 23, 42, 0.96), rgba(2, 6, 23, 0.96))",
+                  backgroundClip: "padding-box",
                   transform: `rotate(${rotation}deg)`,
                 }}
               >
