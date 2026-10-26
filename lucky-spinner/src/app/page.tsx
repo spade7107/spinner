@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -29,24 +30,14 @@ export default function Home() {
 
   const wheelGradient = useMemo(() => {
     if (!entries.length) return "transparent";
-    if (entries.length === 1) return `conic-gradient(${colors[0]} 0deg 360deg)`;
-
-    const gap = Math.min(0.8, segmentSize * 0.2);
-    const halfGap = gap / 2;
-    const stops = [
-      `#0f172a 0deg ${halfGap}deg`,
-      ...entries.flatMap((_, index) => {
-        const start = index * segmentSize + halfGap;
-        const end = (index + 1) * segmentSize - halfGap;
-        const gapEnd = index === entries.length - 1 ? 360 : end + gap;
+    const stops = entries
+      .map((_, index) => {
+        const start = index * segmentSize;
+        const end = (index + 1) * segmentSize;
         const color = colors[index % colors.length];
-
-        return [
-          `${color} ${start}deg ${end}deg`,
-          `#0f172a ${end}deg ${gapEnd}deg`,
-        ];
-      }),
-    ].join(", ");
+        return `${color} ${start}deg ${end}deg`;
+      })
+      .join(", ");
 
     return `conic-gradient(${stops})`;
   }, [entries, segmentSize]);
@@ -87,6 +78,20 @@ export default function Home() {
     setWinner(null);
     setRotation(0);
     setIsSpinning(false);
+  };
+
+  const handleRemoveName = (indexToRemove: number) => {
+    if (isSpinning) return;
+
+    const removedName = entries[indexToRemove];
+    const remainingEntries = entries.filter((_, index) => index !== indexToRemove);
+
+    setEntries(remainingEntries);
+    setWinner((currentWinner) =>
+      currentWinner === removedName && !remainingEntries.includes(removedName)
+        ? null
+        : currentWinner
+    );
   };
 
   return (
@@ -178,15 +183,41 @@ export default function Home() {
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
-              <p className="mb-2 text-sm font-medium text-slate-200">Current entries</p>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-sm font-medium text-slate-200">
+                  Current entries ({entries.length})
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReset}
+                  disabled={isSpinning}
+                  className="border-white/10 bg-slate-900 text-slate-100"
+                >
+                  <RotateCcw aria-hidden="true" />
+                  Reset
+                </Button>
+              </div>
               <div className="flex max-h-52 flex-wrap gap-2 overflow-auto">
                 {entries.length ? (
                   entries.map((entry, index) => (
                     <span
                       key={`${entry}-${index}`}
-                      className="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3 py-1 text-sm text-cyan-200"
+                      className="inline-flex items-center gap-1 rounded-full border border-cyan-500/40 bg-cyan-500/10 py-1 pl-3 pr-1 text-sm text-cyan-200"
                     >
                       {entry}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Remove ${entry}`}
+                        title={`Remove ${entry}`}
+                        onClick={() => handleRemoveName(index)}
+                        disabled={isSpinning}
+                        className="h-7 w-7 rounded-full p-0 text-cyan-200 hover:bg-cyan-400/20 hover:text-white"
+                      >
+                        <X aria-hidden="true" />
+                      </Button>
                     </span>
                   ))
                 ) : (
@@ -196,17 +227,7 @@ export default function Home() {
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-sm font-medium text-slate-200">Winner</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleReset}
-                  className="border-white/10 bg-slate-900 text-slate-100"
-                >
-                  Reset
-                </Button>
-              </div>
+              <p className="mb-2 text-sm font-medium text-slate-200">Winner</p>
 
               <div className="min-h-[52px] rounded-xl bg-slate-900 p-3 text-lg font-bold text-white">
                 {winner
