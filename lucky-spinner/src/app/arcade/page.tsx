@@ -5,7 +5,14 @@ import Link from "next/link";
 import { ArrowLeft, Coins, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const prizes = [
+type Prize = {
+  label: string;
+  multiplier: number;
+  angle: number;
+  color: string;
+};
+
+const prizes: Prize[] = [
   { label: "NO PRIZE", multiplier: 0, angle: 136.5, color: "#ed5b53" },
   { label: "0.5x", multiplier: 0.5, angle: 100, color: "#e8a534" },
   { label: "1x", multiplier: 1, angle: 76, color: "#20a88b" },
@@ -15,6 +22,22 @@ const prizes = [
   { label: "10x", multiplier: 10, angle: 2, color: "#68833b" },
   { label: "25x", multiplier: 25, angle: 1, color: "#52a5c5" },
   { label: "50x", multiplier: 50, angle: 0.5, color: "#d0ad43" },
+];
+
+const missSlice = { ...prizes[0], angle: prizes[0].angle / 4 };
+const wheelSlices = [
+  { ...prizes[1], id: "half" },
+  { ...missSlice, id: "miss-1" },
+  { ...prizes[5], id: "five" },
+  { ...prizes[2], id: "one" },
+  { ...missSlice, id: "miss-2" },
+  { ...prizes[6], id: "ten" },
+  { ...prizes[3], id: "two" },
+  { ...missSlice, id: "miss-3" },
+  { ...prizes[7], id: "twenty-five" },
+  { ...prizes[4], id: "three" },
+  { ...missSlice, id: "miss-4" },
+  { ...prizes[8], id: "fifty" },
 ] as const;
 
 const wagers = [5, 10, 25, 50];
@@ -26,14 +49,14 @@ const payoutWeightedAngle = prizes.reduce(
 );
 const theoreticalRtp = payoutWeightedAngle / totalWheelAngle;
 const houseEdge = 1 - theoreticalRtp;
-const prizeCenters = prizes.map((prize, index) =>
-  prizes.slice(0, index).reduce((angle, previousPrize) => angle + previousPrize.angle, 0) + prize.angle / 2
+const prizeCenters = wheelSlices.map((prize, index) =>
+  wheelSlices.slice(0, index).reduce((angle, previousPrize) => angle + previousPrize.angle, 0) + prize.angle / 2
 );
 const formatCredits = (amount: number) => amount.toLocaleString("en-US");
 
 const wheelGradient = (() => {
   let start = 0;
-  const stops = prizes.map((prize) => {
+  const stops = wheelSlices.map((prize) => {
     const end = start + prize.angle;
     const stop = `${prize.color} ${start}deg ${end}deg`;
     start = end;
@@ -46,12 +69,12 @@ function pickPrize() {
   const roll = Math.random() * 360;
   let end = 0;
 
-  for (const prize of prizes) {
+  for (const prize of wheelSlices) {
     end += prize.angle;
     if (roll < end) return { prize, center: end - prize.angle / 2 };
   }
 
-  const lastPrize = prizes[prizes.length - 1];
+  const lastPrize = wheelSlices[wheelSlices.length - 1];
   return { prize: lastPrize, center: 360 - lastPrize.angle / 2 };
 }
 
@@ -60,7 +83,7 @@ export default function ArcadePage() {
   const [wager, setWager] = useState(10);
   const [isSpinning, setIsSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
-  const [result, setResult] = useState<(typeof prizes)[number] | null>(null);
+  const [result, setResult] = useState<Prize | null>(null);
   const [returned, setReturned] = useState(0);
   const [isResultDialogOpen, setIsResultDialogOpen] = useState(false);
   const resultDialogRef = useRef<HTMLDialogElement>(null);
@@ -164,12 +187,12 @@ export default function ArcadePage() {
                 className={`absolute inset-2 rounded-full border-[3px] border-[#f6db7b] transition-transform duration-[5200ms] ease-[cubic-bezier(0.12,0.83,0.2,1)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#61d4bf] focus-visible:ring-offset-4 focus-visible:ring-offset-[#121927] ${isSpinning || balance < wager ? "cursor-not-allowed" : "cursor-pointer"}`}
                 style={{ background: wheelGradient, transform: `rotate(${rotation}deg)` }}
               >
-                {prizes.map((prize, index) => {
+                {wheelSlices.map((prize, index) => {
                   if (prize.angle < 10) return null;
                     const center = prizeCenters[index];
                     return (
                       <span
-                        key={prize.label}
+                        key={prize.id}
                         className="pointer-events-none absolute left-1/2 top-1/2 grid place-items-center rounded-full bg-black/15 px-1 py-0.5 font-black leading-none text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
                         style={{
                           fontSize: prize.angle < 22 ? "8px" : prize.angle < 35 ? "9px" : "11px",
@@ -266,6 +289,9 @@ export default function ArcadePage() {
                   <p className="mt-1 text-[10px] text-white/35">{payoutWeightedAngle}° weighted return ÷ {totalWheelAngle}° total = {(theoreticalRtp * 100).toFixed(2)}% RTP</p>
                 </div>
               </div>
+              <p className="mt-3 text-[10px] leading-relaxed text-white/40">
+                The miss chance is split across four wedges; the board shows their combined probability.
+              </p>
             </section>
 
             <section className="rounded-2xl border border-white/10 bg-[#121927]/85 p-5 sm:p-6">
