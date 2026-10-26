@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { RotateCcw, Undo2 } from "lucide-react";
+import Link from "next/link";
+import { RotateCcw, Sparkles, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   columnTargets,
@@ -184,13 +185,21 @@ export default function Home() {
               </h1>
             </div>
           </div>
-          <div className="flex items-center gap-3 rounded-lg border border-[#d3b975]/30 bg-[#111e17]/90 px-4 py-2.5">
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a9b4a9]">
-              Play credits
-            </span>
-            <span className="font-mono text-xl font-bold tabular-nums text-[#f1d28a]">
-              {formatCredits(balance)}
-            </span>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/arcade"
+              className="inline-flex items-center gap-2 rounded-lg border border-[#c9ad70]/30 bg-[#17251c] px-3 py-2.5 text-xs font-semibold text-[#ead7a5] transition hover:border-[#c9ad70]/70 hover:bg-[#203629]"
+            >
+              <Sparkles aria-hidden="true" className="h-4 w-4" /> Arcade wheel
+            </Link>
+            <div className="flex items-center gap-3 rounded-lg border border-[#d3b975]/30 bg-[#111e17]/90 px-4 py-2.5">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a9b4a9]">
+                Play credits
+              </span>
+              <span className="font-mono text-xl font-bold tabular-nums text-[#f1d28a]">
+                {formatCredits(balance)}
+              </span>
+            </div>
           </div>
         </header>
 
