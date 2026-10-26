@@ -108,7 +108,18 @@ export default function Home() {
           <div className="flex justify-center">
             <div className="relative aspect-square w-full max-w-[420px]">
               <div
-                className="absolute inset-0 rounded-full border-[10px] border-slate-950 shadow-[0_0_60px_rgba(34,211,238,0.2)] transition-transform duration-[6200ms] ease-[cubic-bezier(0.12,0.83,0.2,1)]"
+                role="button"
+                tabIndex={0}
+                aria-label={isSpinning ? "Wheel is spinning" : entries.length < 2 ? "Add at least two names to spin" : "Spin the wheel"}
+                aria-disabled={isSpinning || entries.length < 2}
+                onClick={handleSpin}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    handleSpin();
+                  }
+                }}
+                className={`absolute inset-0 rounded-full border-[10px] border-slate-950 shadow-[0_0_60px_rgba(34,211,238,0.2)] transition-transform duration-[6200ms] ease-[cubic-bezier(0.12,0.83,0.2,1)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-300 focus-visible:ring-offset-4 focus-visible:ring-offset-slate-950 ${isSpinning || entries.length < 2 ? "cursor-not-allowed" : "cursor-pointer"}`}
                 style={{
                   background: entries.length
                     ? wheelGradient
@@ -236,17 +247,8 @@ export default function Home() {
                     ? "Spinning..."
                     : entries.length < 2
                       ? "Add at least two names to spin"
-                      : "Ready to spin"}
+                      : "Click or tap the wheel to spin"}
               </div>
-
-              <Button
-                className="mt-4 w-full"
-                size="lg"
-                onClick={handleSpin}
-                disabled={isSpinning || entries.length < 2}
-              >
-                {isSpinning ? "Spinning..." : "Spin the wheel"}
-              </Button>
             </div>
           </div>
         </div>
