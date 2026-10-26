@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,8 +20,22 @@ export default function Home() {
   const [entries, setEntries] = useState<string[]>([]);
   const [name, setName] = useState("");
   const [winner, setWinner] = useState<string | null>(null);
+  const [winnerIndex, setWinnerIndex] = useState<number | null>(null);
+  const [isWinnerDialogOpen, setIsWinnerDialogOpen] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
+  const winnerDialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const dialog = winnerDialogRef.current;
+    if (!dialog) return;
+
+    if (isWinnerDialogOpen && !dialog.open) {
+      dialog.showModal();
+    } else if (!isWinnerDialogOpen && dialog.open) {
+      dialog.close();
+    }
+  }, [isWinnerDialogOpen]);
 
   const segmentSize = entries.length ? 360 / entries.length : 0;
   const labelRadius = entries.length === 1
@@ -49,6 +63,8 @@ export default function Home() {
     setEntries((prev) => [...prev, clean]);
     setName("");
     setWinner(null);
+    setWinnerIndex(null);
+    setIsWinnerDialogOpen(false);
   };
 
   const handleSpin = () => {
@@ -64,11 +80,15 @@ export default function Home() {
 
     setIsSpinning(true);
     setWinner(null);
+    setWinnerIndex(null);
+    setIsWinnerDialogOpen(false);
     setRotation(targetRotation);
 
     window.setTimeout(() => {
       setWinner(entries[selectedIndex]);
+      setWinnerIndex(selectedIndex);
       setIsSpinning(false);
+      setIsWinnerDialogOpen(true);
     }, 6200);
   };
 
@@ -76,6 +96,8 @@ export default function Home() {
     setEntries([]);
     setName("");
     setWinner(null);
+    setWinnerIndex(null);
+    setIsWinnerDialogOpen(false);
     setRotation(0);
     setIsSpinning(false);
   };
@@ -83,14 +105,20 @@ export default function Home() {
   const handleRemoveName = (indexToRemove: number) => {
     if (isSpinning) return;
 
-    const removedName = entries[indexToRemove];
     const remainingEntries = entries.filter((_, index) => index !== indexToRemove);
+    const removedWinner = winnerIndex === indexToRemove;
 
     setEntries(remainingEntries);
-    setWinner((currentWinner) =>
-      currentWinner === removedName && !remainingEntries.includes(removedName)
+    if (removedWinner) {
+      setWinner(null);
+      setIsWinnerDialogOpen(false);
+    }
+    setWinnerIndex((currentIndex) =>
+      currentIndex === null || currentIndex === indexToRemove
         ? null
-        : currentWinner
+        : currentIndex > indexToRemove
+          ? currentIndex - 1
+          : currentIndex
     );
   };
 
@@ -253,6 +281,47 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      <dialog
+        ref={winnerDialogRef}
+        aria-labelledby="winner-dialog-title"
+        onClose={() => setIsWinnerDialogOpen(false)}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) winnerDialogRef.current?.close();
+        }}
+        className="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl border border-white/10 bg-slate-900 p-0 text-slate-100 shadow-2xl shadow-cyan-500/20 backdrop:bg-slate-950/80"
+      >
+        <div className="p-6 text-center sm:p-8">
+          <p
+            id="winner-dialog-title"
+            className="text-sm font-semibold uppercase tracking-[0.22em] text-cyan-300"
+          >
+            We have a winner!
+          </p>
+          <p className="mt-5 break-words text-4xl font-bold text-white sm:text-5xl">
+            {winner}
+          </p>
+          <div className="mt-8 flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => winnerDialogRef.current?.close()}
+              autoFocus
+              className="border-white/15 bg-slate-800 text-slate-100 hover:bg-slate-700"
+            >
+              Close
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (winnerIndex !== null) handleRemoveName(winnerIndex);
+                winnerDialogRef.current?.close();
+              }}
+            >
+              Remove
+            </Button>
+          </div>
+        </div>
+      </dialog>
     </main>
   );
 }
