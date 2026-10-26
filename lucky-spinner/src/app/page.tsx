@@ -31,7 +31,7 @@ export default function Home() {
     if (!entries.length) return "transparent";
     if (entries.length === 1) return `conic-gradient(${colors[0]} 0deg 360deg)`;
 
-    const gap = Math.min(2.5, segmentSize * 0.2);
+    const gap = Math.min(0.8, segmentSize * 0.2);
     const halfGap = gap / 2;
     const stops = [
       `#0f172a 0deg ${halfGap}deg`,
@@ -103,7 +103,7 @@ export default function Home() {
           <div className="flex justify-center">
             <div className="relative aspect-square w-full max-w-[420px]">
               <div
-                className="absolute inset-0 rounded-full border-[10px] border-white/10 shadow-[0_0_60px_rgba(34,211,238,0.2)] transition-transform duration-[6200ms] ease-[cubic-bezier(0.12,0.83,0.2,1)]"
+                className="absolute inset-0 rounded-full border-[10px] border-slate-950 shadow-[0_0_60px_rgba(34,211,238,0.2)] transition-transform duration-[6200ms] ease-[cubic-bezier(0.12,0.83,0.2,1)]"
                 style={{
                   background: entries.length
                     ? wheelGradient
