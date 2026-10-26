@@ -4,17 +4,6 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-const defaultOptions = [
-  "Alice",
-  "Ben",
-  "Charlie",
-  "Diana",
-  "Ethan",
-  "Fiona",
-  "George",
-  "Hannah",
-];
-
 const colors = [
   "#f59e0b",
   "#ec4899",
@@ -27,13 +16,16 @@ const colors = [
 ];
 
 export default function Home() {
-  const [entries, setEntries] = useState<string[]>(defaultOptions);
+  const [entries, setEntries] = useState<string[]>([]);
   const [name, setName] = useState("");
-  const [winner, setWinner] = useState<string | null>(defaultOptions[0]);
+  const [winner, setWinner] = useState<string | null>(null);
   const [isSpinning, setIsSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
 
-  const segmentSize = 360 / Math.max(entries.length, 1);
+  const segmentSize = entries.length ? 360 / entries.length : 0;
+  const labelRadius = entries.length === 1
+    ? 0
+    : Math.min(138, Math.max(76, 165 - entries.length * 4));
 
   const wheelGradient = useMemo(() => {
     if (!entries.length) return "transparent";
@@ -59,13 +51,15 @@ export default function Home() {
   };
 
   const handleSpin = () => {
-    if (isSpinning || !entries.length) return;
+    if (isSpinning || entries.length < 2) return;
 
     const selectedIndex = Math.floor(Math.random() * entries.length);
 
     const spins = 7;
-    const extraTurn = 360 * spins;
-    const targetRotation = rotation + extraTurn - selectedIndex * segmentSize;
+    const currentOffset = ((rotation % 360) + 360) % 360;
+    const selectedAngle = (selectedIndex + 0.5) * segmentSize;
+    const alignment = (360 - ((selectedAngle + currentOffset) % 360)) % 360;
+    const targetRotation = rotation + 360 * spins + alignment;
 
     setIsSpinning(true);
     setWinner(null);
@@ -78,9 +72,9 @@ export default function Home() {
   };
 
   const handleReset = () => {
-    setEntries(defaultOptions);
+    setEntries([]);
     setName("");
-    setWinner(defaultOptions[0]);
+    setWinner(null);
     setRotation(0);
     setIsSpinning(false);
   };
@@ -97,38 +91,44 @@ export default function Home() {
 
         <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="flex justify-center">
-            <div className="relative h-[420px] w-[420px]">
+            <div className="relative aspect-square w-full max-w-[420px]">
               <div
                 className="absolute inset-0 rounded-full border-[10px] border-white/10 shadow-[0_0_60px_rgba(34,211,238,0.2)] transition-transform duration-[6200ms] ease-[cubic-bezier(0.12,0.83,0.2,1)]"
                 style={{
-                  background: wheelGradient,
+                  background: entries.length
+                    ? wheelGradient
+                    : "radial-gradient(circle, rgba(15, 23, 42, 0.96), rgba(2, 6, 23, 0.96))",
                   transform: `rotate(${rotation}deg)`,
                 }}
               >
-                <div className="absolute inset-[38px] rounded-full border border-white/10 bg-slate-950/20" />
-              </div>
+                {entries.map((entry, index) => {
+                  const angle = segmentSize * (index + 0.5);
 
-              {entries.map((entry, index) => {
-                const angle = (360 / entries.length) * index - 90;
-                const radius = 150;
-
-                return (
-                  <div
-                    key={`${entry}-${index}`}
-                    className="pointer-events-none absolute left-1/2 top-1/2"
-                    style={{
-                      transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(-${radius}px) rotate(${-angle}deg)`,
-                    }}
-                  >
-                    <span
-                      className="block max-w-[95px] overflow-hidden text-ellipsis whitespace-nowrap rounded-full border border-white/20 bg-slate-950/50 px-2 py-1 text-center text-xs font-semibold text-white shadow-md"
-                      title={entry}
+                  return (
+                    <div
+                      key={`${entry}-${index}`}
+                      className="pointer-events-none absolute left-1/2 top-1/2"
+                      style={{
+                        transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(-${labelRadius}px) rotate(${-angle - rotation}deg)`,
+                      }}
                     >
-                      {entry}
-                    </span>
+                      <span
+                        className="block max-w-[104px] overflow-hidden text-ellipsis whitespace-nowrap rounded-full border border-white/25 bg-slate-950/55 px-2 py-1 text-center font-semibold text-white shadow-md"
+                        style={{ fontSize: entries.length > 8 ? "10px" : "12px" }}
+                        title={entry}
+                      >
+                        {entry}
+                      </span>
+                    </div>
+                  );
+                })}
+
+                {!entries.length && (
+                  <div className="absolute inset-0 grid place-items-center px-8 text-center text-sm font-medium text-slate-400">
+                    Add a name to create your first slice
                   </div>
-                );
-              })}
+                )}
+              </div>
 
               <div className="absolute left-1/2 top-0 z-20 -translate-x-1/2 -translate-y-1/2">
                 <div
@@ -137,7 +137,6 @@ export default function Home() {
                 />
               </div>
 
-              <div className="absolute inset-[58px] rounded-full border border-dashed border-white/20" />
             </div>
           </div>
 
@@ -170,14 +169,18 @@ export default function Home() {
             <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
               <p className="mb-2 text-sm font-medium text-slate-200">Current entries</p>
               <div className="flex max-h-52 flex-wrap gap-2 overflow-auto">
-                {entries.map((entry, index) => (
-                  <span
-                    key={`${entry}-${index}`}
-                    className="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3 py-1 text-sm text-cyan-200"
-                  >
-                    {entry}
-                  </span>
-                ))}
+                {entries.length ? (
+                  entries.map((entry, index) => (
+                    <span
+                      key={`${entry}-${index}`}
+                      className="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3 py-1 text-sm text-cyan-200"
+                    >
+                      {entry}
+                    </span>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-400">No names added yet.</p>
+                )}
               </div>
             </div>
 
@@ -195,7 +198,13 @@ export default function Home() {
               </div>
 
               <div className="min-h-[52px] rounded-xl bg-slate-900 p-3 text-lg font-bold text-white">
-                {winner ? winner : isSpinning ? "Spinning..." : "Ready to spin"}
+                {winner
+                  ? winner
+                  : isSpinning
+                    ? "Spinning..."
+                    : entries.length < 2
+                      ? "Add at least two names to spin"
+                      : "Ready to spin"}
               </div>
 
               <Button
