@@ -1,145 +1,219 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { RotateCcw, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { RotateCcw, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import {
+  columnTargets,
+  dozenTargets,
+  getNumberColor,
+  getWinningReturn,
+  numberTargets,
+  outsideTargets,
+  type BetTarget,
+  type PlacedBet,
+  type RouletteColor,
+  wheelGradient,
+  wheelOrder,
+} from "@/lib/roulette";
 
-const colors = [
-  "#f59e0b",
-  "#ec4899",
-  "#8b5cf6",
-  "#10b981",
-  "#38bdf8",
-  "#f97316",
-  "#ef4444",
-  "#22c55e",
+const chips = [
+  { value: 1, color: "#f4f0df" },
+  { value: 5, color: "#d44b43" },
+  { value: 25, color: "#398b67" },
+  { value: 100, color: "#4175bb" },
 ];
 
+const numberRows = [3, 2, 1];
+const wheelSegmentSize = 360 / wheelOrder.length;
+const numberLabelRadius = 126;
+const formatCredits = (amount: number) => amount.toLocaleString("en-US");
+
+type RouletteResult = {
+  number: number;
+  color: RouletteColor;
+  returned: number;
+};
+
+function colorClasses(color: RouletteColor) {
+  if (color === "green") return "bg-[#237954] text-white";
+  if (color === "red") return "bg-[#b83834] text-white";
+  return "bg-[#202622] text-white";
+}
+
 export default function Home() {
-  const [entries, setEntries] = useState<string[]>([]);
-  const [name, setName] = useState("");
-  const [winner, setWinner] = useState<string | null>(null);
-  const [winnerIndex, setWinnerIndex] = useState<number | null>(null);
-  const [isWinnerDialogOpen, setIsWinnerDialogOpen] = useState(false);
+  const [balance, setBalance] = useState(1000);
+  const [selectedChip, setSelectedChip] = useState(5);
+  const [bets, setBets] = useState<PlacedBet[]>([]);
   const [isSpinning, setIsSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
-  const winnerDialogRef = useRef<HTMLDialogElement>(null);
+  const [result, setResult] = useState<RouletteResult | null>(null);
+  const [recentResults, setRecentResults] = useState<{ number: number; color: RouletteColor }[]>([]);
+  const [isResultDialogOpen, setIsResultDialogOpen] = useState(false);
+  const resultDialogRef = useRef<HTMLDialogElement>(null);
+  const nextBetId = useRef(0);
 
   useEffect(() => {
-    const dialog = winnerDialogRef.current;
+    const dialog = resultDialogRef.current;
     if (!dialog) return;
 
-    if (isWinnerDialogOpen && !dialog.open) {
+    if (isResultDialogOpen && !dialog.open) {
       dialog.showModal();
-    } else if (!isWinnerDialogOpen && dialog.open) {
+    } else if (!isResultDialogOpen && dialog.open) {
       dialog.close();
     }
-  }, [isWinnerDialogOpen]);
+  }, [isResultDialogOpen]);
 
-  const segmentSize = entries.length ? 360 / entries.length : 0;
-  const labelRadius = entries.length === 1
-    ? 0
-    : Math.min(138, Math.max(76, 165 - entries.length * 4));
+  const totalWager = bets.reduce((total, bet) => total + bet.amount, 0);
+  const getTargetWager = (targetId: string) =>
+    bets.reduce(
+      (total, bet) => total + (bet.target.id === targetId ? bet.amount : 0),
+      0
+    );
 
-  const wheelGradient = useMemo(() => {
-    if (!entries.length) return "transparent";
-    const stops = entries
-      .map((_, index) => {
-        const start = index * segmentSize;
-        const end = (index + 1) * segmentSize;
-        const color = colors[index % colors.length];
-        return `${color} ${start}deg ${end}deg`;
-      })
-      .join(", ");
+  const handlePlaceBet = (target: BetTarget) => {
+    if (isSpinning || balance < selectedChip) return;
 
-    return `conic-gradient(${stops})`;
-  }, [entries, segmentSize]);
+    setBalance((currentBalance) => currentBalance - selectedChip);
+    setBets((currentBets) => [
+      ...currentBets,
+      { id: nextBetId.current++, target, amount: selectedChip },
+    ]);
+    setResult(null);
+  };
 
-  const handleAddName = () => {
-    const clean = name.trim();
-    if (!clean || isSpinning) return;
+  const handleUndoBet = () => {
+    if (isSpinning || bets.length === 0) return;
 
-    setEntries((prev) => [...prev, clean]);
-    setName("");
-    setWinner(null);
-    setWinnerIndex(null);
-    setIsWinnerDialogOpen(false);
+    const lastBet = bets[bets.length - 1];
+    setBets((currentBets) => currentBets.slice(0, -1));
+    setBalance((currentBalance) => currentBalance + lastBet.amount);
+  };
+
+  const handleClearBets = () => {
+    if (isSpinning || bets.length === 0) return;
+
+    setBalance((currentBalance) => currentBalance + totalWager);
+    setBets([]);
+    setResult(null);
   };
 
   const handleSpin = () => {
-    if (isSpinning || entries.length < 2) return;
+    if (isSpinning || bets.length === 0) return;
 
-    const selectedIndex = Math.floor(Math.random() * entries.length);
-
-    const spins = 7;
+    const winningNumber = Math.floor(Math.random() * 37);
+    const wheelIndex = wheelOrder.indexOf(winningNumber);
     const currentOffset = ((rotation % 360) + 360) % 360;
-    const selectedAngle = (selectedIndex + 0.5) * segmentSize;
-    const alignment = (360 - ((selectedAngle + currentOffset) % 360)) % 360;
-    const targetRotation = rotation + 360 * spins + alignment;
+    const winningAngle = (wheelIndex + 0.5) * wheelSegmentSize;
+    const alignment = (360 - ((winningAngle + currentOffset) % 360)) % 360;
+    const targetRotation = rotation + 360 * 7 + alignment;
 
     setIsSpinning(true);
-    setWinner(null);
-    setWinnerIndex(null);
-    setIsWinnerDialogOpen(false);
+    setResult(null);
+    setIsResultDialogOpen(false);
     setRotation(targetRotation);
 
     window.setTimeout(() => {
-      setWinner(entries[selectedIndex]);
-      setWinnerIndex(selectedIndex);
+      const color = getNumberColor(winningNumber);
+      const returned = getWinningReturn(bets, winningNumber);
+      const roundResult = { number: winningNumber, color, returned };
+
+      setResult(roundResult);
+      setRecentResults((previousResults) => [
+        { number: winningNumber, color },
+        ...previousResults,
+      ].slice(0, 8));
+      setBalance((currentBalance) => currentBalance + returned);
+      setBets([]);
       setIsSpinning(false);
-      setIsWinnerDialogOpen(true);
-    }, 6200);
+      setIsResultDialogOpen(true);
+    }, 5200);
   };
 
-  const handleReset = () => {
-    setEntries([]);
-    setName("");
-    setWinner(null);
-    setWinnerIndex(null);
-    setIsWinnerDialogOpen(false);
-    setRotation(0);
-    setIsSpinning(false);
-  };
+  const renderBetTarget = (target: BetTarget, extraClasses = "") => {
+    const wager = getTargetWager(target.id);
+    const number = target.kind === "number" ? Number(target.label) : null;
+    const tone = number !== null
+      ? colorClasses(getNumberColor(number))
+      : target.id === "red"
+        ? "bg-[#b83834] text-white"
+        : target.id === "black"
+          ? "bg-[#202622] text-white"
+          : "bg-[#154633] text-[#f4ead0]";
 
-  const handleRemoveName = (indexToRemove: number) => {
-    if (isSpinning) return;
-
-    const remainingEntries = entries.filter((_, index) => index !== indexToRemove);
-    const removedWinner = winnerIndex === indexToRemove;
-
-    setEntries(remainingEntries);
-    if (removedWinner) {
-      setWinner(null);
-      setIsWinnerDialogOpen(false);
-    }
-    setWinnerIndex((currentIndex) =>
-      currentIndex === null || currentIndex === indexToRemove
-        ? null
-        : currentIndex > indexToRemove
-          ? currentIndex - 1
-          : currentIndex
+    return (
+      <button
+        key={target.id}
+        type="button"
+        onClick={() => handlePlaceBet(target)}
+        disabled={isSpinning || balance < selectedChip}
+        aria-label={`Bet on ${target.label}${wager ? `, ${wager} credits already placed` : ""}`}
+        className={`relative flex min-h-11 items-center justify-center border border-[#c8ab6e]/45 font-semibold transition hover:brightness-125 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f1d28a] disabled:cursor-not-allowed disabled:opacity-55 ${tone} ${extraClasses}`}
+      >
+        <span>{target.label}</span>
+        {wager > 0 && (
+          <span className="absolute -right-1 -top-2 z-10 grid h-6 min-w-6 place-items-center rounded-full border-2 border-[#f4ead0] bg-[#d6b566] px-1 text-[10px] font-black text-[#1b211c] shadow-lg">
+            {wager}
+          </span>
+        )}
+      </button>
     );
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-10">
-      <div className="w-full max-w-5xl rounded-3xl border border-white/10 bg-slate-900/80 p-6 shadow-2xl shadow-cyan-500/10 backdrop-blur-xl">
-        <div className="mb-8 text-center">
-          <p className="text-sm uppercase tracking-[0.3em] text-cyan-400">
-            Lucky Choice
-          </p>
-          <h1 className="mt-3 text-4xl font-black text-white">Name Spinner</h1>
-        </div>
+    <main
+      className="min-h-screen px-3 py-5 text-[#f4ead0] sm:px-6 sm:py-8"
+      style={{
+        backgroundColor: "#08130e",
+        backgroundImage:
+          "radial-gradient(ellipse at 50% 0%, rgba(48, 103, 69, 0.32), transparent 56%), repeating-linear-gradient(135deg, rgba(255,255,255,0.012) 0, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 6px)",
+      }}
+    >
+      <div className="mx-auto max-w-7xl">
+        <header className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-[#d3b975]/20 pb-5 sm:mb-8">
+          <div className="flex items-center gap-4">
+            <div className="grid h-12 w-12 place-items-center rounded-full border border-[#dfc17b]/70 bg-[#183b2a] text-xl font-black text-[#f1d28a] shadow-[0_0_24px_rgba(204,170,96,0.12)]">
+              0
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.32em] text-[#c9ad70]">
+                The green room
+              </p>
+              <h1 className="mt-0.5 text-2xl font-black tracking-wide text-[#fff7e5] sm:text-3xl">
+                Roulette
+              </h1>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded-lg border border-[#d3b975]/30 bg-[#111e17]/90 px-4 py-2.5">
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a9b4a9]">
+              Play credits
+            </span>
+            <span className="font-mono text-xl font-bold tabular-nums text-[#f1d28a]">
+              {formatCredits(balance)}
+            </span>
+          </div>
+        </header>
 
-        <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="flex flex-col items-center gap-4">
-            <div className="relative aspect-square w-full max-w-[420px]">
+        <div className="grid items-start gap-6 xl:grid-cols-[minmax(320px,0.82fr)_minmax(0,1.18fr)]">
+          <section className="rounded-xl border border-[#d3b975]/20 bg-[#101d16]/85 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.24)] sm:p-6">
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#c9ad70]">
+                  European wheel
+                </p>
+                <p className="mt-1 text-xs text-[#98a79a]">Single zero · 37 pockets</p>
+              </div>
+              <div className="rounded border border-[#d3b975]/25 px-2.5 py-1 text-[10px] font-bold tracking-[0.15em] text-[#d6c28f]">
+                35 : 1
+              </div>
+            </div>
+
+            <div className="relative mx-auto aspect-square w-full max-w-[390px] rounded-full border-[7px] border-[#b99a5b] bg-[#755b32] p-[7px] shadow-[0_10px_38px_rgba(0,0,0,0.45),inset_0_0_0_2px_#e2c77f]">
               <div
                 role="button"
                 tabIndex={0}
-                aria-label={isSpinning ? "Wheel is spinning" : entries.length < 2 ? "Add at least two names to spin" : "Spin the wheel"}
-                aria-disabled={isSpinning || entries.length < 2}
+                aria-label={isSpinning ? "Roulette wheel is spinning" : bets.length === 0 ? "Place a bet to spin the roulette wheel" : "Tap to spin the roulette wheel"}
+                aria-disabled={isSpinning || bets.length === 0}
                 onClick={handleSpin}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
@@ -147,173 +221,206 @@ export default function Home() {
                     handleSpin();
                   }
                 }}
-                className={`absolute inset-0 rounded-full border-[10px] border-slate-950 shadow-[0_0_60px_rgba(34,211,238,0.2)] transition-transform duration-[6200ms] ease-[cubic-bezier(0.12,0.83,0.2,1)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-300 focus-visible:ring-offset-4 focus-visible:ring-offset-slate-950 ${isSpinning || entries.length < 2 ? "cursor-not-allowed" : "cursor-pointer"}`}
-                style={{
-                  background: entries.length
-                    ? wheelGradient
-                    : "radial-gradient(circle, rgba(15, 23, 42, 0.96), rgba(2, 6, 23, 0.96))",
-                  backgroundClip: "padding-box",
-                  transform: `rotate(${rotation}deg)`,
-                }}
+                className={`absolute inset-[7px] rounded-full border-[3px] border-[#e0c47b] shadow-[inset_0_0_0_4px_rgba(18,26,20,0.7)] transition-transform duration-[5200ms] ease-[cubic-bezier(0.12,0.83,0.2,1)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#f1d28a] focus-visible:ring-offset-4 focus-visible:ring-offset-[#101d16] ${isSpinning || bets.length === 0 ? "cursor-not-allowed" : "cursor-pointer"}`}
+                style={{ background: wheelGradient, transform: `rotate(${rotation}deg)` }}
               >
-                {entries.map((entry, index) => {
-                  const angle = segmentSize * (index + 0.5);
-
+                {wheelOrder.map((number, index) => {
+                  const angle = (index + 0.5) * wheelSegmentSize;
                   return (
-                    <div
-                      key={`${entry}-${index}`}
-                      className="pointer-events-none absolute left-1/2 top-1/2"
+                    <span
+                      key={number}
+                      className="pointer-events-none absolute left-1/2 top-1/2 grid h-5 w-5 place-items-center rounded-full bg-black/15 text-[9px] font-bold tabular-nums text-white sm:text-[10px]"
                       style={{
-                        transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(-${labelRadius}px) rotate(${-angle - rotation}deg)`,
+                        transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(-${numberLabelRadius}px) rotate(${-angle - rotation}deg)`,
                       }}
                     >
-                      <span
-                        className="block max-w-[104px] overflow-hidden text-ellipsis whitespace-nowrap rounded-full border border-white/25 bg-slate-950/55 px-2 py-1 text-center font-semibold text-white shadow-md"
-                        style={{ fontSize: entries.length > 8 ? "10px" : "12px" }}
-                        title={entry}
-                      >
-                        {entry}
-                      </span>
-                    </div>
+                      {number}
+                    </span>
                   );
                 })}
-
-                {!entries.length && (
-                  <div className="absolute inset-0 grid place-items-center px-8 text-center text-sm font-medium text-slate-400">
-                    Add a name to create your first slice
-                  </div>
-                )}
               </div>
 
-              <div className="absolute left-1/2 top-0 z-20 -translate-x-1/2 -translate-y-1/2">
-                <div
-                  className="h-0 w-0 border-l-[18px] border-r-[18px] border-b-[36px] border-l-transparent border-r-transparent border-b-cyan-400 drop-shadow-[0_0_15px_rgba(34,211,238,0.8)]"
-                  aria-hidden="true"
-                />
+              <div className="pointer-events-none absolute left-1/2 top-1 z-20 -translate-x-1/2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                <div className="h-0 w-0 border-l-[12px] border-r-[12px] border-t-[22px] border-l-transparent border-r-transparent border-t-[#f1d28a]" />
               </div>
-
+              <div className="pointer-events-none absolute inset-[34%] z-10 grid place-items-center rounded-full border-[5px] border-[#c9a964] bg-[radial-gradient(circle_at_35%_30%,#27392b,#101811_72%)] text-center shadow-[0_0_0_4px_#17221a,0_8px_20px_rgba(0,0,0,0.55)]">
+                <div>
+                  <p className="text-[8px] font-bold uppercase tracking-[0.24em] text-[#bba66f]">
+                    {result ? "Last result" : "Place your bets"}
+                  </p>
+                  <p className={`mt-1 font-mono text-4xl font-black leading-none ${result ? (result.color === "red" ? "text-[#e56a61]" : result.color === "green" ? "text-[#62bd8b]" : "text-white") : "text-[#f1d28a]"}`}>
+                    {result ? result.number : "SPIN"}
+                  </p>
+                </div>
+              </div>
             </div>
-            <p aria-live="polite" className="text-center text-sm font-semibold text-cyan-200">
+
+            <p aria-live="polite" className="mt-5 min-h-5 text-center text-sm font-semibold text-[#e2ce98]">
               {isSpinning
-                ? "The wheel is spinning..."
-                : entries.length < 2
-                  ? "Add at least two names, then tap the wheel to spin"
-                  : "Tap the wheel to spin"}
+                ? "The ball is in motion..."
+                : bets.length
+                  ? "Tap the wheel to spin"
+                  : "Place a chip on the table, then tap the wheel to spin"}
             </p>
-          </div>
 
-          <div className="space-y-5">
-            <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
-              <label className="mb-2 block text-sm font-medium text-slate-200">
-                Add a name
-              </label>
-              <div className="flex gap-2">
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Type a name"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleAddName();
-                  }}
-                  disabled={isSpinning}
-                  className="bg-slate-900 text-white placeholder:text-slate-400"
-                />
-                <Button
-                  variant="default"
-                  onClick={handleAddName}
-                  disabled={!name.trim() || isSpinning}
-                >
-                  Add
-                </Button>
+            <div className="mt-6 border-t border-[#d3b975]/15 pt-4">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a9b4a9]">
+                  Recent numbers
+                </p>
+                <span className="text-xs tabular-nums text-[#c9ad70]">{recentResults.length} / 8</span>
+              </div>
+              <div className="flex min-h-9 flex-wrap gap-2">
+                {recentResults.length ? recentResults.map((recent, index) => (
+                  <span
+                    key={`${recent.number}-${index}`}
+                    className={`grid h-8 w-8 place-items-center rounded-full border border-white/15 font-mono text-xs font-bold ${colorClasses(recent.color)}`}
+                  >
+                    {recent.number}
+                  </span>
+                )) : <span className="text-xs text-[#758378]">Results will appear here</span>}
               </div>
             </div>
+          </section>
 
-            <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-sm font-medium text-slate-200">
-                  Current entries ({entries.length})
-                </p>
+          <div className="space-y-6">
+            <section className="rounded-xl border border-[#d3b975]/20 bg-[#101d16]/85 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.2)] sm:p-5">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#c9ad70]">
+                    Your chips
+                  </p>
+                  <p className="mt-1 text-xs text-[#98a79a]">Choose a value, then tap a bet</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#98a79a]">On the table</p>
+                  <p className="font-mono text-lg font-bold tabular-nums text-[#f1d28a]">{formatCredits(totalWager)}</p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                {chips.map((chip) => (
+                  <button
+                    key={chip.value}
+                    type="button"
+                    onClick={() => setSelectedChip(chip.value)}
+                    disabled={isSpinning}
+                    aria-pressed={selectedChip === chip.value}
+                    aria-label={`Select ${chip.value} credit chip`}
+                    className={`grid h-12 w-12 place-items-center rounded-full border-[3px] font-mono text-sm font-black shadow-[0_3px_6px_rgba(0,0,0,0.35)] transition hover:-translate-y-0.5 disabled:opacity-60 ${selectedChip === chip.value ? "scale-110 ring-2 ring-[#f1d28a] ring-offset-2 ring-offset-[#101d16]" : "opacity-80"}`}
+                    style={{ backgroundColor: chip.color, color: chip.value === 1 ? "#172018" : "#fff", borderColor: chip.value === 1 ? "#fff9df" : "rgba(255,255,255,0.75)" }}
+                  >
+                    {chip.value}
+                  </button>
+                ))}
+                <span className="ml-auto text-xs text-[#a9b4a9]">
+                  Selected: <strong className="text-[#f1d28a]">{selectedChip}</strong>
+                </span>
+              </div>
+
+              <div className="mt-5 flex flex-wrap gap-2 border-t border-[#d3b975]/15 pt-4">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleReset}
-                  disabled={isSpinning}
-                  className="border-white/10 bg-slate-900 text-slate-100"
+                  onClick={handleUndoBet}
+                  disabled={isSpinning || bets.length === 0}
+                  className="border-[#d3b975]/25 bg-[#17251c] text-[#e8ddbd] hover:bg-[#203629]"
                 >
-                  <RotateCcw aria-hidden="true" />
-                  Reset
+                  <Undo2 aria-hidden="true" /> Undo bet
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClearBets}
+                  disabled={isSpinning || bets.length === 0}
+                  className="border-[#d3b975]/25 bg-[#17251c] text-[#e8ddbd] hover:bg-[#203629]"
+                >
+                  <RotateCcw aria-hidden="true" /> Clear table
+                </Button>
+                <span className="ml-auto self-center text-xs text-[#98a79a]">
+                  {bets.length} {bets.length === 1 ? "bet" : "bets"}
+                </span>
               </div>
-              <div className="flex max-h-52 flex-wrap gap-2 overflow-auto">
-                {entries.length ? (
-                  entries.map((entry, index) => (
-                    <span
-                      key={`${entry}-${index}`}
-                      className="inline-flex items-center gap-1 rounded-full border border-cyan-500/40 bg-cyan-500/10 py-1 pl-3 pr-1 text-sm text-cyan-200"
-                    >
-                      {entry}
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Remove ${entry}`}
-                        title={`Remove ${entry}`}
-                        onClick={() => handleRemoveName(index)}
-                        disabled={isSpinning}
-                        className="h-7 w-7 rounded-full p-0 text-cyan-200 hover:bg-cyan-400/20 hover:text-white"
-                      >
-                        <X aria-hidden="true" />
-                      </Button>
-                    </span>
-                  ))
-                ) : (
-                  <p className="text-sm text-slate-400">No names added yet.</p>
-                )}
-              </div>
-            </div>
+            </section>
 
+            <section aria-label="Roulette betting table" className="rounded-xl border border-[#c9a964]/40 bg-[#145337] p-3 shadow-[0_16px_45px_rgba(0,0,0,0.26)] sm:p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#f0dba5]">Place your bets</p>
+                <span className="text-[10px] font-semibold tracking-wide text-[#a9c5ac]">EUROPEAN · SINGLE ZERO</span>
+              </div>
+
+              <div className="space-y-2">
+                {renderBetTarget(numberTargets[0], "min-h-10 w-full rounded-sm")}
+
+                <div className="overflow-x-auto pb-1">
+                  <div className="grid min-w-[560px] grid-flow-col grid-rows-3 grid-cols-[repeat(12,minmax(0,1fr))] gap-1">
+                    {Array.from({ length: 36 }, (_, index) => {
+                      const column = Math.floor(index / 3);
+                      const row = index % 3;
+                      const number = column * 3 + numberRows[row];
+                      return renderBetTarget(
+                        numberTargets[number],
+                        "aspect-[1/1.18] min-h-10 rounded-sm p-0 text-sm"
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-1.5">
+                  {columnTargets.map((target) => renderBetTarget(target, "rounded-sm px-1 text-[10px] sm:text-xs"))}
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {dozenTargets.map((target) => renderBetTarget(target, "rounded-sm px-1 text-xs"))}
+                </div>
+                <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
+                  {outsideTargets.map((target) => renderBetTarget(target, "rounded-sm px-1 text-[10px] sm:text-xs"))}
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1 border-t border-white/10 pt-3 text-[10px] text-[#c0d2c2]">
+                <span>Straight up <strong className="text-white">35:1</strong></span>
+                <span>Dozens &amp; columns <strong className="text-white">2:1</strong></span>
+                <span>Outside bets <strong className="text-white">1:1</strong></span>
+              </div>
+            </section>
           </div>
         </div>
       </div>
 
       <dialog
-        ref={winnerDialogRef}
-        aria-labelledby="winner-dialog-title"
-        onClose={() => setIsWinnerDialogOpen(false)}
+        ref={resultDialogRef}
+        aria-labelledby="result-dialog-title"
+        onClose={() => setIsResultDialogOpen(false)}
         onClick={(event) => {
-          if (event.target === event.currentTarget) winnerDialogRef.current?.close();
+          if (event.target === event.currentTarget) resultDialogRef.current?.close();
         }}
-        className="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl border border-white/10 bg-slate-900 p-0 text-slate-100 shadow-2xl shadow-cyan-500/20 backdrop:bg-slate-950/80"
+        className="m-auto w-[calc(100%-2rem)] max-w-sm rounded-xl border border-[#c9a964]/50 bg-[#101d16] p-0 text-[#f4ead0] shadow-2xl shadow-black/50 backdrop:bg-black/75"
       >
         <div className="p-6 text-center sm:p-8">
-          <p
-            id="winner-dialog-title"
-            className="text-sm font-semibold uppercase tracking-[0.22em] text-cyan-300"
+          <p id="result-dialog-title" className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#c9ad70]">
+            Round complete
+          </p>
+          {result && (
+            <>
+              <p className="mt-3 text-sm text-[#a9b4a9]">The ball landed on</p>
+              <div className={`mx-auto mt-3 grid h-20 w-20 place-items-center rounded-full border-[5px] border-[#e3cb88] font-mono text-4xl font-black shadow-lg ${colorClasses(result.color)}`}>
+                {result.number}
+              </div>
+              <p className="mt-4 text-lg font-bold text-[#fff7e5]">
+                {result.returned > 0 ? `You won ${formatCredits(result.returned)} credits` : "No winning bets this round"}
+              </p>
+              {result.returned > 0 && (
+                <p className="mt-1 text-xs text-[#98a79a]">Includes returned winning stakes</p>
+              )}
+            </>
+          )}
+          <Button
+            onClick={() => resultDialogRef.current?.close()}
+            autoFocus
+            className="mt-7 min-w-32 bg-[#c5a45f] font-bold text-[#152017] hover:bg-[#d6b975]"
           >
-            We have a winner!
-          </p>
-          <p className="mt-5 break-words text-4xl font-bold text-white sm:text-5xl">
-            {winner}
-          </p>
-          <div className="mt-8 flex justify-end gap-3">
-            <Button
-              variant="outline"
-              onClick={() => winnerDialogRef.current?.close()}
-              autoFocus
-              className="border-white/15 bg-slate-800 text-slate-100 hover:bg-slate-700"
-            >
-              Close
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (winnerIndex !== null) handleRemoveName(winnerIndex);
-                winnerDialogRef.current?.close();
-              }}
-            >
-              Remove
-            </Button>
-          </div>
+            Keep playing
+          </Button>
         </div>
       </dialog>
     </main>
