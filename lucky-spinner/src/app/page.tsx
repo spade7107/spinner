@@ -29,17 +29,27 @@ export default function Home() {
 
   const wheelGradient = useMemo(() => {
     if (!entries.length) return "transparent";
-    const stops = entries
-      .map((_, index) => {
-        const start = (index / entries.length) * 360;
-        const end = ((index + 1) / entries.length) * 360;
+    if (entries.length === 1) return `conic-gradient(${colors[0]} 0deg 360deg)`;
+
+    const gap = Math.min(2.5, segmentSize * 0.2);
+    const halfGap = gap / 2;
+    const stops = [
+      `#0f172a 0deg ${halfGap}deg`,
+      ...entries.flatMap((_, index) => {
+        const start = index * segmentSize + halfGap;
+        const end = (index + 1) * segmentSize - halfGap;
+        const gapEnd = index === entries.length - 1 ? 360 : end + gap;
         const color = colors[index % colors.length];
-        return `${color} ${start}deg ${end}deg`;
-      })
-      .join(", ");
+
+        return [
+          `${color} ${start}deg ${end}deg`,
+          `#0f172a ${end}deg ${gapEnd}deg`,
+        ];
+      }),
+    ].join(", ");
 
     return `conic-gradient(${stops})`;
-  }, [entries]);
+  }, [entries, segmentSize]);
 
   const handleAddName = () => {
     const clean = name.trim();
